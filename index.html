@@ -427,11 +427,11 @@
                 let factors = getScaleFactors();
                 const game = {
                     states: {
-                        loadScreenFinished: true,
-                        loadScreenPlayButtonClicked: true,
+                        loadScreenFinished: false,
+                        loadScreenPlayButtonClicked: false,
                         titleScreen: false,
                         tutorial: false,
-                        playing: true,
+                        playing: false,
                         currentLevel: {
                             id: 1,
                             characters: [],
@@ -542,7 +542,7 @@
                         }
                     },
                     deltaTimeStamp: Date.now(),
-                    solveTimer: 300,
+                    solveTimer: 30,
                     penalty: 0
                 };
                 canvas.addEventListener('mousemove', (event) => {
