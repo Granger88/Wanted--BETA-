@@ -1,2 +1,2 @@
 # Wanted [BETA]
- A beta test of a game I'm making
+ A beta test of a game I'm making.
