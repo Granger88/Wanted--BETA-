@@ -427,6 +427,7 @@
                 let factors = getScaleFactors();
                 const game = {
                     states: {
+                        focused: true,
                         loadScreenFinished: false,
                         loadScreenPlayButtonClicked: false,
                         titleScreen: false,
@@ -451,6 +452,7 @@
                         },
                         audio: {
                            titleScreenMusic: await loadAudio('assets/audio/title_screen.mp3'),
+                           gameplay: await loadAudio('assets/audio/gameplay.mp3'),
                            tick: await loadAudio('assets/audio/tick.mp3'),
                            points: await loadAudio('assets/audio/points.mp3')
                         }
@@ -520,6 +522,8 @@
                                     } else {
                                         game.states.playing = true;
                                         game.assets.audio.titleScreenMusic.pause();
+                                        game.assets.audio.gameplay.loop = true;
+                                        game.assets.audio.gameplay.play();
                                     }
                                 });
                                 playButton.draw();
@@ -553,6 +557,20 @@
                     game.handlers.mouseAction();
                     game.handlers.mouseAction = () => {};
                     canvas.style.cursor = 'default';
+                });
+                window.addEventListener('focus', () => {
+                    game.deltaTimeStamp = Date.now();
+                    for (var i in game.assets.audio) {
+                        game.assets.audio[i].volume = 1;
+                    }
+                    game.states.focused = true;
+                        
+                });
+                window.addEventListener('blur', () => {
+                    game.states.focused = false;
+                    for (var i in game.assets.audio) {
+                        game.assets.audio[i].volume = 0;
+                    }
                 });
                 function animateLoadScreen() {
                     game.UI.loadScreenArea = {
@@ -612,6 +630,7 @@
                                 game.assets.audio.points.play();
                             }
                             game.solveTimer += 1;
+                            game.solveTimer = Math.ceil(game.solveTimer);
                             game.assets.audio.points.currentTime = 0;
                         }
                         awardTimeTimer += 1;
@@ -630,6 +649,10 @@
                 let solveTimeout = 60;
                 let awardTimeTimer = 0;
                 function mainLoop() {
+                    if (!game.states.focused) {
+                        requestAnimationFrame(mainLoop);
+                        return;
+                    }
                     factors = getScaleFactors();
                     //ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transformations
                     ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear the canvas
@@ -737,7 +760,7 @@
                     }
                     requestAnimationFrame(mainLoop);
                 }
-                mainLoop();
+                requestAnimationFrame(mainLoop);
             })();
         </script>
     </body>
