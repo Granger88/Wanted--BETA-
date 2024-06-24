@@ -1,7 +1,64 @@
 (async () => {
+    // Standard game height
     const gameWidth = 1920;
     const gameHeight = 1080;
-    const aspectRatio = gameWidth / gameHeight;
+
+    /**
+     * @type {HTMLCanvasElement} canvas Main playable area
+    **/
+    const canvas = document.getElementById('game');
+
+    // Scale factors to adjust the size of different game elements
+    function getScaleFactors() {
+        let x = canvas.width / gameWidth;
+        let y = canvas.height / gameHeight;
+        return {
+            x,
+            y
+        }
+    }
+
+    // Canvas context
+    const ctx = canvas.getContext('2d');
+
+    // Game assets
+    const assets = {
+        images: [],
+        audio: []
+    };
+    const assetNames = {
+        images: ['Tier3Games.png', 'HEAD_GUMBALL.png', 'HEAD_DARWIN.png', 'HEAD_ANAIS.png', 'HEAD_NICOLE.png', 'HEAD_RICHARD.png'],
+        audio: ['gameplay.mp3', 'points.mp3', 'tick.mp3', 'title_screen.mp3']
+    };
+
+    // Load assets
+
+    async function loadAssets() {
+        let loadSize = assetNames.images.length + assetNames.audio.length;
+
+        for (var i of assetNames.images) {
+            try {
+                let image = await loadImage(`assets/images/${i}`);
+                assets.images[i.split('.').reverse().slice(1).reverse().join('.')] = image;
+                game.states.assetsLoadProgress += (1 / loadSize ) * 100;
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        for (var i of assetNames.audio) {
+            try {
+                let audio = await loadAudio(`assets/audio/${i}`);
+                assets.audio[i.split('.').reverse().slice(1).reverse().join('.')] = audio;
+                game.states.assetsLoadProgress += (1 / loadSize ) * 100;
+            } catch (e) {
+                console.error(e);
+            }
+        }
+    }
+    // Automatically resize the canvas & maintain aspect ratio
+
+
     function resizeCanvas() {
         const aspectRatio = gameWidth / gameHeight;
         let width = window.innerWidth;
@@ -18,24 +75,11 @@
         canvas.width = width;
         canvas.height = height;
     }
+
     /**
-        * @type {HTMLCanvasElement} canvas
+     * @param {string} src The source URL of the image asset.
+     * @returns {Promise.<HTMLImageElement>}
     **/
-    const canvas = document.getElementById('game');
-
-    function getScaleFactors() {
-        let x = canvas.width / gameWidth;
-        let y = canvas.height / gameHeight;
-        return {
-            x,
-            y
-        }
-    }
-
-    /**
-        * @param {string} src The source URL of the image asset.
-        * @returns {Promise.<HTMLImageElement>}
-        * */
     function loadImage(src) {
         return new Promise((resolve, reject) => {
             let image = new Image();
@@ -45,6 +89,7 @@
             image.src = src;
         });
     }
+
     /**
      * @param {string} src The source URL of the image asset.
      * @returns {Promise.<HTMLAudioElement>}
@@ -58,10 +103,12 @@
             audio.src = src;
         });
     }
+
+    // Preset canvas dimensions
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    const ctx = canvas.getContext('2d');
-    //ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Wanted posters
     class WantedPoster {
         constructor(image, x, y, collapsible) {
             this.image = image;
@@ -152,6 +199,8 @@
             }
         }
     }
+
+    // Text buttons
     class TextButton {
         constructor(text, font, textColor, backgroundColor, borderSize, borderColor, x, y, width, height, maxWidth, onclick) {
             this.text = text;
@@ -193,6 +242,8 @@
             }
         }
     }
+
+    // Characters
     class Character {
         /**
          * @param {number} charId The ID for the character
@@ -292,6 +343,8 @@
             }
         }
     }
+
+    // Levels
     class Level {
         /** 
          * @param {"GRID_*" | "ORGANIZED" | "ORGANIZED_MOVING" | "SCATTERED" | "SCATTERED_MOVING"} style
@@ -393,10 +446,15 @@
             this.wantedPoster.draw(game.solveTimer);
         }
     }
+
+    // Get initial scaling factors
     let factors = getScaleFactors();
+    
+    // Main game object
     const game = {
         states: {
             focused: true,
+            assetsLoadProgress: 0,
             loadScreenFinished: false,
             loadScreenPlayButtonClicked: false,
             titleScreen: false,
@@ -410,22 +468,7 @@
                 level: null
             }
         },
-        assets: {
-            images: {
-                developerImage: await loadImage('assets/images/Tier3Games.png'),
-                HEAD_GUMBALL: await loadImage('assets/images/HEAD_GUMBALL.png'),
-                HEAD_DARWIN: await loadImage('assets/images/HEAD_DARWIN.png'),
-                HEAD_ANAIS: await loadImage('assets/images/HEAD_ANAIS.png'),
-                HEAD_NICOLE: await loadImage('assets/images/HEAD_NICOLE.png'),
-                HEAD_RICHARD: await loadImage('assets/images/HEAD_RICHARD.png')
-            },
-            audio: {
-                titleScreenMusic: await loadAudio('assets/audio/title_screen.mp3'),
-                gameplay: await loadAudio('assets/audio/gameplay.mp3'),
-                tick: await loadAudio('assets/audio/tick.mp3'),
-                points: await loadAudio('assets/audio/points.mp3')
-            }
-        },
+        assets: null,
         UI: {
             loadScreenArea: {
                 width: 300 * factors.x,
@@ -463,8 +506,8 @@
                             game.handlers.mouseAction = () => { };
                             canvas.style.cursor = 'default';
                             game.states.loadScreenPlayButtonClicked = true;
-                            game.assets.audio.titleScreenMusic.loop = true;
-                            game.assets.audio.titleScreenMusic.play();
+                            game.assets.audio.title_screen.loop = true;
+                            game.assets.audio.title_screen.play();
                             game.states.titleScreen = true
                         };
                     } else {
@@ -490,18 +533,56 @@
                             game.states.tutorial = true;
                         } else {
                             game.states.playing = true;
-                            game.assets.audio.titleScreenMusic.pause();
+                            game.assets.audio.title_screen.pause();
                             game.assets.audio.gameplay.loop = true;
                             game.assets.audio.gameplay.play();
                         }
                     });
                     playButton.draw();
                     ctx.beginPath();
-                    ctx.drawImage(game.assets.images.developerImage, 0, 0, game.assets.images.developerImage.width, game.assets.images.developerImage.height, canvas.width - (150 * factors.x), canvas.height - (150 * factors.y), 100 * factors.x, 100 * factors.y);
+                    ctx.drawImage(game.assets.images.Tier3Games, 0, 0, game.assets.images.Tier3Games.width, game.assets.images.Tier3Games.height, canvas.width - (150 * factors.x), canvas.height - (150 * factors.y), 100 * factors.x, 100 * factors.y);
                 }
             },
             playingScreen: {
 
+            },
+            drawLoadBar() {
+                game.UI.loadScreenArea = {
+                    width: 300 * factors.x,
+                    height: 300 * factors.y,
+                    x: Math.floor(canvas.getBoundingClientRect().width / 2 - ((300 / 2) * factors.x)),
+                    y: Math.floor(canvas.getBoundingClientRect().height / 2 - (350 * factors.y))
+                };                
+                // Black screen
+                ctx.beginPath();
+                ctx.fillStyle = 'black';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Calculate load bar size
+                let loadBarWidth = this.loadScreenArea.width + 340 * factors.x;
+                let progress = (loadBarWidth / 100) * game.states.assetsLoadProgress;
+                ctx.beginPath();
+                ctx.fillStyle = 'green';
+                ctx.fillRect(this.loadScreenArea.x - 170 * factors.x, this.loadScreenArea.y + 350 * factors.y, progress, 50 * factors.y);
+
+                // Load bar background
+                ctx.beginPath();
+                ctx.lineWidth = 2 * factors.x;
+                ctx.strokeStyle = 'white';
+                ctx.moveTo(this.loadScreenArea.x - 170 * factors.x, this.loadScreenArea.y + 350 * factors.y);
+                ctx.lineTo(this.loadScreenArea.x - 170 * factors.x, this.loadScreenArea.y + 400 * factors.y);
+                ctx.lineTo(this.loadScreenArea.x + this.loadScreenArea.width + 170 * factors.x, this.loadScreenArea.y + 400 * factors.y);
+                ctx.lineTo(this.loadScreenArea.x + this.loadScreenArea.width + 170 * factors.x, this.loadScreenArea.y + 350 * factors.y);
+                ctx.lineTo(this.loadScreenArea.x - 170 * factors.x, this.loadScreenArea.y + 350 * factors.y);
+                ctx.stroke();
+
+                // "Loading..." text
+                ctx.beginPath();
+                ctx.font = `bold ${30 * factors.x}px arcade`;
+                ctx.fillStyle = 'white';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('Loading...', this.loadScreenArea.x + (this.loadScreenArea.width / 2), this.loadScreenArea.y + 375 * factors.y, 120 * factors.x);
             }
         },
         mouse: {
@@ -518,6 +599,8 @@
         solveTimer: 30,
         penalty: 0
     };
+
+    // Canvas events
     canvas.addEventListener('mousemove', (event) => {
         game.mouse.x = event.x - canvas.getBoundingClientRect().x;
         game.mouse.y = event.y - canvas.getBoundingClientRect().y;
@@ -527,6 +610,8 @@
         game.handlers.mouseAction = () => { };
         canvas.style.cursor = 'default';
     });
+
+    // Window focus events
     window.addEventListener('focus', () => {
         game.deltaTimeStamp = Date.now();
         for (var i in game.assets.audio) {
@@ -541,30 +626,25 @@
             game.assets.audio[i].volume = 0;
         }
     });
+
+    // Animate load screen
     function animateLoadScreen() {
         game.UI.loadScreenArea = {
             width: 300 * factors.x,
             height: 300 * factors.y,
             x: Math.floor(canvas.getBoundingClientRect().width / 2 - ((300 / 2) * factors.x)),
             y: Math.floor(canvas.getBoundingClientRect().height / 2 - (350 * factors.y))
-        }
-        const { developerImage } = game.assets.images;
-        game.loadScreen = true
+        };
+        const { Tier3Games:developerImage } = game.assets.images;
+        game.loadScreen = true;
         // Background
-        ctx.beginPath()
+        ctx.beginPath();
         ctx.fillStyle = `rgba(0, 0, 0, ${1})`;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         // Create area for load screen
         let { loadScreenArea } = game.UI;
         // Animate text
         let textTransparency = .1;
-        function animateText() {
-            return new Promise((resolve, reject) => {
-                setTimeout(() => {
-
-                }, 100);
-            });
-        }
         ctx.beginPath();
         ctx.fillStyle = `rgba(255, 0, 0, 0)`;
         ctx.fillRect(loadScreenArea.x, loadScreenArea.y, loadScreenArea.width, loadScreenArea.height);
@@ -590,6 +670,8 @@
             game.states.loadScreenFinished = true
         }
     }
+
+    // Award time for solving
     function animateAwardTime() {
         let frameInterval = 6;
         let maxPoints = 5;
@@ -610,6 +692,8 @@
             return true;
         }
     }
+
+    // Load screen animation variables
     let loadScreenTextOpacity = 0;
     let loadScreenPauseDuration = 0;
     let loadScreenImageOpacity = 0;
@@ -617,16 +701,30 @@
     let loadScreenFadeout = 0;
     let solveTimeout = 60;
     let awardTimeTimer = 0;
+
+    // Main game loop. Runs on every frame.
     function mainLoop() {
         if (!game.states.focused) {
             requestAnimationFrame(mainLoop);
             return;
         }
         factors = getScaleFactors();
-        //ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transformations
-        ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear the canvas
-        //context.scale(scaleX, scaleY); 
+
+        // Clear the canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Resize the canvas
         resizeCanvas();
+
+        // ---- [ALL DRAWN ELEMENTS MUST GO BELOW THIS LINE AS THE CANVAS HAS NOW BEEN CLEARED, SCALED, AND THE SCALE FACTORS ARE DEFINED] ----
+        if (game.states.assetsLoadProgress < 100) {
+            game.UI.drawLoadBar();
+            requestAnimationFrame(mainLoop);
+            return;
+        } else if (!game.assets) {
+            game.assets = assets;
+        }
+        //context.scale(scaleX, scaleY); 
         let deltaTime = Date.now() - game.deltaTimeStamp;
         game.deltaTimeStamp = Date.now();
 
@@ -730,4 +828,7 @@
         requestAnimationFrame(mainLoop);
     }
     requestAnimationFrame(mainLoop);
+    
+    // Load assets
+    await loadAssets();
 })();
