@@ -323,13 +323,12 @@
                 console.log('Solved level, stopping movement.');
             }
             // Check mouse
-            if (game.mouse.x >= this.x && game.mouse.x <= this.x + this.image.width / 4 && game.mouse.y >= this.y && game.mouse.y <= this.y + this.image.height / 4) {
+            if (game.mouse.x >= this.x && game.mouse.x <= this.x + (this.image.width * factors.x) / 4 && game.mouse.y >= this.y && game.mouse.y <= this.y + (this.image.height * factors.y) / 4) {
                 canvas.style.cursor = 'pointer';
                 game.mouseHit = this;
                 game.handlers.mouseAction = () => {
                     if (!this.wanted) {
-                        console.log('Penalty.');
-                        game.penalty = 30;
+                        game.penalty = 120;
                         game.solveTimer -= game.solveTimer >= 10 ? 10 : game.solveTimer;
                     } else {
                         game.states.currentLevel.solved = true;
