@@ -3,4 +3,4 @@
 
 Created by
 
-![Tier3Games logo][assets/images/Tier3Games.png]
+[Logo]: https://github.com/Granger88/Wanted--BETA-/blob/main/assets/images/Tier3Games.png
