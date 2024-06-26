@@ -40,7 +40,7 @@
             try {
                 let image = await loadImage(`assets/images/${i}`);
                 assets.images[i.split('.').reverse().slice(1).reverse().join('.')] = image;
-                game.states.assetsLoadProgress += (1 / loadSize ) * 100;
+                game.states.assetsLoadProgress += (1 / loadSize) * 100;
             } catch (e) {
                 console.error(e);
             }
@@ -50,7 +50,7 @@
             try {
                 let audio = await loadAudio(`assets/audio/${i}`);
                 assets.audio[i.split('.').reverse().slice(1).reverse().join('.')] = audio;
-                game.states.assetsLoadProgress += (1 / loadSize ) * 100;
+                game.states.assetsLoadProgress += (1 / loadSize) * 100;
             } catch (e) {
                 console.error(e);
             }
@@ -299,12 +299,13 @@
                 this.respawnPoint.y = this.y;
             }
         }
-        draw() {
+        draw(deltaTime) {
+            let speedMultiplier = 60 / Math.floor(1 / deltaTime);
             ctx.beginPath();
             ctx.drawImage(this.image, 0, 0, this.image.width, this.image.height, this.x, this.y, (this.image.width * factors.x) / 4, (this.image.height * factors.y) / 4);
             if (!game.states.currentLevel.solved) {
-                this.x += this.run * factors.x;
-                this.y += this.rise * factors.y;
+                this.x += (this.run * factors.x) * speedMultiplier;
+                this.y += (this.rise * factors.y) * speedMultiplier;
                 if (Math.abs(this.oscillationState.x.current) >= this.oscillateDistanceX) {
                     this.oscillationState.x.multiplier = -this.oscillationState.x.multiplier
                 }
@@ -313,14 +314,12 @@
                     this.oscillationState.y.multiplier = -this.oscillationState.y.multiplier
                 }
                 this.oscillationState.y.current += this.oscillateSpeedY * this.oscillationState.y.multiplier;
-                this.x += this.run + this.oscillationState.x.current;
-                this.y += this.rise + this.oscillationState.y.current;
+                this.x += this.run + this.oscillationState.x.current * speedMultiplier;
+                this.y += this.rise + this.oscillationState.y.current * speedMultiplier;
                 if ((this.x >= canvas.width || this.x <= -this.image.width / 4) || (this.y >= canvas.height || this.y <= -this.image.height / 4)) {
                     this.x = this.respawnPoint.x;
                     this.y = this.respawnPoint.y;
                 }
-            } else {
-                console.log('Solved level, stopping movement.');
             }
             // Check mouse
             if (game.mouse.x >= this.x && game.mouse.x <= this.x + (this.image.width * factors.x) / 4 && game.mouse.y >= this.y && game.mouse.y <= this.y + (this.image.height * factors.y) / 4) {
@@ -420,7 +419,7 @@
             this.wantedPoster = new WantedPoster(this.wanted.image, 0, 0, true);
             return this;
         }
-        draw() {
+        draw(deltaTime) {
             if (game.states.currentLevel.solved) {
                 this.wantedPoster.draw(game.solveTimer);
                 this.wanted.draw();
@@ -438,7 +437,7 @@
                 row++;
                 col = 0;
                 for (var j of i) {
-                    j.draw();
+                    j.draw(deltaTime);
                 }
             }
             // Wanted poster
@@ -448,7 +447,7 @@
 
     // Get initial scaling factors
     let factors = getScaleFactors();
-    
+
     // Main game object
     const game = {
         states: {
@@ -551,7 +550,7 @@
                     height: 300 * factors.y,
                     x: Math.floor(canvas.getBoundingClientRect().width / 2 - ((300 / 2) * factors.x)),
                     y: Math.floor(canvas.getBoundingClientRect().height / 2 - (350 * factors.y))
-                };                
+                };
                 // Black screen
                 ctx.beginPath();
                 ctx.fillStyle = 'black';
@@ -604,7 +603,9 @@
         game.mouse.x = event.x - canvas.getBoundingClientRect().x;
         game.mouse.y = event.y - canvas.getBoundingClientRect().y;
     });
-    canvas.addEventListener('click', () => {
+    canvas.addEventListener('click', (event) => {
+        game.mouse.x = event.x - canvas.getBoundingClientRect().x;
+        game.mouse.y = event.y - canvas.getBoundingClientRect().y;
         game.handlers.mouseAction();
         game.handlers.mouseAction = () => { };
         canvas.style.cursor = 'default';
@@ -613,6 +614,10 @@
     // Window focus events
     window.addEventListener('focus', () => {
         game.deltaTimeStamp = Date.now();
+        if (!game.assets) {
+            game.states.focused = true;
+            return;
+        };
         for (var i in game.assets.audio) {
             game.assets.audio[i].volume = 1;
         }
@@ -621,20 +626,23 @@
     });
     window.addEventListener('blur', () => {
         game.states.focused = false;
+        if (!game.assets) {
+            return;
+        }
         for (var i in game.assets.audio) {
             game.assets.audio[i].volume = 0;
         }
     });
 
     // Animate load screen
-    function animateLoadScreen() {
+    function animateLoadScreen(deltaTime) {
         game.UI.loadScreenArea = {
             width: 300 * factors.x,
             height: 300 * factors.y,
             x: Math.floor(canvas.getBoundingClientRect().width / 2 - ((300 / 2) * factors.x)),
             y: Math.floor(canvas.getBoundingClientRect().height / 2 - (350 * factors.y))
         };
-        const { Tier3Games:developerImage } = game.assets.images;
+        const { Tier3Games: developerImage } = game.assets.images;
         game.loadScreen = true;
         // Background
         ctx.beginPath();
@@ -656,26 +664,29 @@
         ctx.fillStyle = `rgba(0, 0, 0, ${(1 - loadScreenImageOpacity) + loadScreenFadeout})`;
         ctx.fillRect(loadScreenArea.x + (loadScreenArea.width / 2) - 100 * factors.x, loadScreenArea.y + (loadScreenArea.height / 2) - 20 * factors.y, 200 * factors.x, 200 * factors.y);
         if (loadScreenTextOpacity <= 1) {
-            loadScreenTextOpacity += 1 / 40;
+            loadScreenTextOpacity += (deltaTime / .67) / 1;
         } else if (loadScreenPauseDuration <= 1) {
-            loadScreenPauseDuration += 1 / 60;
+            loadScreenPauseDuration += (deltaTime / 1) / 1;
         } else if (loadScreenImageOpacity <= 1) {
-            loadScreenImageOpacity += 1 / 60
+            loadScreenImageOpacity += (deltaTime / 1) / 1;
         } else if (loadScreenStandingDuration <= 1) {
-            loadScreenStandingDuration += 1 / 120
+            loadScreenStandingDuration += (deltaTime / 2) / 1;
         } else if (loadScreenFadeout <= 1) {
-            loadScreenFadeout += 1 / 60;
+            loadScreenFadeout += (deltaTime / 1) / 1;
         } else {
             game.states.loadScreenFinished = true
         }
     }
 
     // Award time for solving
-    function animateAwardTime() {
-        let frameInterval = 6;
+    function animateAwardTime(deltaTime) {
         let maxPoints = 5;
-        if (awardTimeTimer < frameInterval * maxPoints) {
-            if (awardTimeTimer % frameInterval === 0) {
+        let interval = 100;
+        let nextIndex = awardTimeIndex + 1;
+        if (awardTimeTimer <= maxPoints * interval) {
+            awardTimeTimer += deltaTime * 1000;
+            if (awardTimeTimer >= nextIndex * 100) {
+                awardTimeIndex++;
                 if (game.assets.audio.points.paused) {
                     game.assets.audio.points.play();
                 }
@@ -683,11 +694,11 @@
                 game.solveTimer = Math.ceil(game.solveTimer);
                 game.assets.audio.points.currentTime = 0;
             }
-            awardTimeTimer += 1;
             return false;
         } else {
             game.assets.audio.points.loop = false;
             awardTimeTimer = 0;
+            awardTimeIndex = 0;
             return true;
         }
     }
@@ -700,6 +711,7 @@
     let loadScreenFadeout = 0;
     let solveTimeout = 60;
     let awardTimeTimer = 0;
+    let awardTimeIndex = 0;
 
     // Main game loop. Runs on every frame.
     function mainLoop() {
@@ -724,11 +736,10 @@
             game.assets = assets;
         }
         //context.scale(scaleX, scaleY); 
-        let deltaTime = Date.now() - game.deltaTimeStamp;
+        let deltaTime = (Date.now() - game.deltaTimeStamp) / 1000;
         game.deltaTimeStamp = Date.now();
-
         if (!game.states.loadScreenFinished) {
-            animateLoadScreen();
+            animateLoadScreen(deltaTime);
             requestAnimationFrame(mainLoop);
             return;
         }
@@ -764,18 +775,18 @@
                         }
                     ]
                 });
-                level.build().draw();
+                level.build().draw(deltaTime);
                 game.states.currentLevel.ready = true;
                 game.states.currentLevel.level = level;
             } else {
                 if (!game.states.currentLevel.solved) {
                     ctx.fillStyle = 'black';
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    game.states.currentLevel.level.draw();
+                    game.states.currentLevel.level.draw(deltaTime);
                     game.penalty = game.penalty > 0 ? game.penalty - 1 : 0;
                     if (game.solveTimer >= 0) {
                         let oldTime = Math.ceil(game.solveTimer);
-                        game.solveTimer -= deltaTime / 1000;
+                        game.solveTimer -= deltaTime;
                         if (oldTime > Math.ceil(game.solveTimer)) {
                             game.assets.audio.tick.play();
                         }
@@ -786,12 +797,11 @@
                     ctx.fillStyle = 'yellow';
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
                     game.penalty = false;
-                    game.states.currentLevel.level.draw();
+                    game.states.currentLevel.level.draw(deltaTime);
                     game.states.currentLevel.level.wantedPoster.collapsible = false;
                     game.states.currentLevel.level.wantedPoster.collapsed = false;
                     if (solveTimeout <= 0) {
-                        if (!animateAwardTime()) {
-                            console.log('Apply stats.');
+                        if (!animateAwardTime(deltaTime)) {
                             game.assets.audio.points.loop = true;
                         } else {
                             solveTimeout = 60;
@@ -827,7 +837,7 @@
         requestAnimationFrame(mainLoop);
     }
     requestAnimationFrame(mainLoop);
-    
+
     // Load assets
     await loadAssets();
 })();
