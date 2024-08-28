@@ -2,7 +2,7 @@
     // Standard game height
     const gameWidth = 1920;
     const gameHeight = 1080;
-
+    
     /**
      * @type {HTMLCanvasElement} canvas Main playable area
     **/
@@ -162,7 +162,6 @@
                     ctx.stroke();
                     // Detect mouse (expanded)
                     if (game.mouse.x >= this.x + 100 * factors.x && game.mouse.x <= this.x + 150 * factors.x && game.mouse.y >= this.y + 290 * factors.x && game.mouse.y <= this.y + 320 * factors.y) {
-                        console.log(game.mouse);
                         canvas.style.cursor = 'pointer';
                         game.mouseHit = this;
                         game.handlers.mouseAction = () => {
@@ -183,7 +182,6 @@
                     ctx.lineTo(this.x + 150 * factors.x, this.y + 10 * factors.y);
                     ctx.stroke();
                     if (game.mouse.x >= this.x + 100 * factors.x && game.mouse.x <= this.x + 150 * factors.x && game.mouse.y >= this.y + 10 * factors.y && game.mouse.y <= this.y + 30 * factors.y) {
-                        console.log(game.mouse);
                         canvas.style.cursor = 'pointer';
                         game.mouseHit = this;
                         game.handlers.mouseAction = () => {
@@ -282,21 +280,31 @@
                 x: 0,
                 y: 0
             };
+            this.respawnTimeout = 0;
         }
         calculateRespawnPoint() {
-            if (Math.abs(this.run) > 0) {
-                while (this.respawnPoint.x <= canvas.width && this.respawnPoint.x >= -this.image.width / 4) {
-                    this.respawnPoint.x = this.respawnPoint.x - this.run;
+            if (this.rise === 0 || this.run === 0) {
+                if (Math.abs(this.run) > 0) {
+                    while (this.respawnPoint.x <= canvas.width && this.respawnPoint.x >= -this.image.width / 4) {
+                        this.respawnPoint.x = this.respawnPoint.x - this.run;
+                    }
+                } else {
+                    this.respawnPoint.x = this.x;
+                }
+                if (Math.abs(this.rise) > 0) {
+                    while (this.respawnPoint.y <= canvas.height && this.respawnPoint.y >= -this.image.height / 4) {
+                        this.respawnPoint.y = this.respawnPoint.y - this.rise;
+                    }
+                } else {
+                    this.respawnPoint.y = this.y;
                 }
             } else {
                 this.respawnPoint.x = this.x;
-            }
-            if (Math.abs(this.rise) > 0) {
-                while (this.respawnPoint.y <= canvas.height && this.respawnPoint.y >= -this.image.height / 4) {
-                    this.respawnPoint.y = this.respawnPoint.y - this.rise;
-                }
-            } else {
                 this.respawnPoint.y = this.y;
+                while (this.respawnPoint.x > -this.image.width / 4 && this.respawnPoint.x < canvas.width + this.image.width / 4 && this.respawnPoint.y > -this.image.height / 4 && this.respawnPoint.y < canvas.height + this.image.height / 4) {
+                    this.respawnPoint.x -= this.run;
+                    this.respawnPoint.y -= this.rise;
+                }
             }
         }
         draw(deltaTime) {
@@ -317,8 +325,17 @@
                 this.x += this.run + this.oscillationState.x.current * speedMultiplier;
                 this.y += this.rise + this.oscillationState.y.current * speedMultiplier;
                 if ((this.x >= canvas.width || this.x <= -this.image.width / 4) || (this.y >= canvas.height || this.y <= -this.image.height / 4)) {
+                    if (this.run < 0 && this.x > 0) {
+                        return;
+                    }
+                    if (this.rise < 0 && this.y > 0) {
+                        return;
+                    }
+                    console.log('Out of bounds!');
                     this.x = this.respawnPoint.x;
                     this.y = this.respawnPoint.y;
+                    this.respawnTimeout = 10;
+                    //this.calculateRespawnPoint();
                 }
             }
             // Check mouse
@@ -345,7 +362,7 @@
     // Levels
     class Level {
         /** 
-         * @param {"GRID_*" | "ORGANIZED" | "ORGANIZED_MOVING" | "SCATTERED" | "SCATTERED_MOVING"} style
+         * @param {"GRID_*" | "SCATTERED" | "SCATTERED_MOVING"} style
         */
         constructor(style, offsetX, offsetY, moveData) {
             this.style = style;
@@ -364,6 +381,10 @@
             };
         }
         build() {
+            let wantedCharacterId = Math.floor(Math.random() * 5) + 1;
+            let characterIds = [1, 2, 3, 4, 5];
+            characterIds = characterIds.filter((i) => i !== wantedCharacterId);
+            let characterArray = [];
             if (this.style.indexOf('GRID') > -1) {
                 // Calculate space needed
                 this.dimensions = this.style.split('_')[1].split('x');
@@ -373,47 +394,187 @@
                 };
                 this.x = (canvas.width / 2 - this.gridDimensions.x + this.offsetX);
                 this.y = (canvas.height / 2 - this.gridDimensions.y + this.offsetY);
-            }
-            let wantedCharacterId = Math.floor(Math.random() * 5) + 1;
-            let characterArray = [];
-            let maxItems = Number(this.dimensions[0]);
-            for (var i = 0; i < this.dimensions[1]; i++) {
-                characterArray.push([]);
-            }
-            let wantedCharacterPosition = Math.floor(Math.random() * maxItems * this.dimensions[1]);
-            let characterIds = [1, 2, 3, 4, 5];
-            characterIds = characterIds.filter((i) => i !== wantedCharacterId);
-            let currentIndex = 0;
-            for (var i = 0; i < maxItems * this.dimensions[1]; i++) {
-                if (characterArray[currentIndex].length === maxItems) {
-                    currentIndex++;
+                let maxItems = Number(this.dimensions[0]);
+                for (var i = 0; i < this.dimensions[1]; i++) {
+                    characterArray.push([]);
                 }
-                let movePatterns = this.moveData.movePatterns[currentIndex] || { rise: 0, run: 0 };
-                if (i === wantedCharacterPosition) {
-                    let character = new Character(wantedCharacterId, true, 0, 0, movePatterns.run, movePatterns.rise, 0, 0, 0, 0);
-                    characterArray[currentIndex].push(character);
-                    this.wanted = character;
-                } else {
-                    let charId = characterIds[Math.floor(Math.random() * characterIds.length)];
-                    let character = new Character(charId, false, 0, 0, movePatterns.run, movePatterns.rise, 0, 0, 0, 0);
-                    characterArray[currentIndex].push(character);
+                let wantedCharacterPosition = Math.floor(Math.random() * maxItems * this.dimensions[1]);
+                let currentIndex = 0;
+                for (var i = 0; i < maxItems * this.dimensions[1]; i++) {
+                    if (characterArray[currentIndex].length === maxItems) {
+                        currentIndex++;
+                    }
+                    let movePatterns = this.moveData.movePatterns[currentIndex] || { rise: 0, run: 0 };
+                    if (i === wantedCharacterPosition) {
+                        let character = new Character(wantedCharacterId, true, 0, 0, movePatterns.run, movePatterns.rise, 0, 0, 0, 0);
+                        characterArray[currentIndex].push(character);
+                        this.wanted = character;
+                    } else {
+                        let charId = characterIds[Math.floor(Math.random() * characterIds.length)];
+                        let character = new Character(charId, false, 0, 0, movePatterns.run, movePatterns.rise, 0, 0, 0, 0);
+                        characterArray[currentIndex].push(character);
+                    }
+                }
+            }
+
+            if (this.style.indexOf('SCATTERED') > -1) {
+                let charCount = Number(this.style.split('_')[1]);
+                // Calculate space of character
+                let space = {
+                    x: 160 * factors.x,
+                    y: 135 * factors.y
+                };
+                let playArea = {
+                    x: (180) * factors.x,
+                    y: (155) * factors.y
+                };
+                // Select the boundaries of the play area
+                let bounds = {
+                    x: {
+                        min: playArea.x / 2,
+                        max: (canvas.width - playArea.x / 2) - space.x
+                    },
+                    y: {
+                        min: playArea.y / 2,
+                        max: (canvas.height - playArea.y / 2) - space.y
+                    }
+                };
+                let allocatedArea = {
+                    x: Math.floor(bounds.x.max / space.x),
+                    y:  Math.floor(bounds.y.max / space.y)
+                };
+                // Highlight play area for visual reference
+                (() => {
+                    ctx.beginPath();
+                    ctx.moveTo(bounds.x.min, bounds.y.min);
+                    ctx.lineWidth = 2;
+                    ctx.lineTo(bounds.x.min, bounds.y.max + space.y);
+                    ctx.lineTo(bounds.x.max + space.x, bounds.y.max + space.y);
+                    ctx.lineTo(bounds.x.max + space.x, bounds.y.min);
+                    ctx.lineTo(bounds.x.min, bounds.y.min)
+                    ctx.strokeStyle = 'red';
+                    ctx.stroke();
+                })();
+                // Random spawn selection
+                let chosenPoints = [];
+                // Visually see spaces
+                for (var jy = bounds.y.min; jy < bounds.y.max; jy += space.y) {
+                    for (var jx = bounds.x.min; jx <= bounds.x.max; jx += space.x) {
+                        ctx.beginPath();
+                        ctx.fillStyle = 'yellow';
+                        ctx.strokeStyle = 'black';
+                        ctx.lineWidth = '1';
+                        ctx.fillRect(jx, jy, space.x, space.y);
+                        ctx.strokeRect(jx, jy, space.x, space.y);
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.fillStyle = 'black';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle'
+                        ctx.font = '30px arial'
+                        ctx.fillText(`${jx}, ${jy}`, jx + (space.x / 2), jy + (space.y / 2), space.x);
+                        // Subtract from maximum if chosen point conflicts with other spaces
+                    }
+                }
+
+
+                for (var i = 0; i < charCount; i++) {
+                    // Select a random spot within the bounds of the play area
+                    let pointX = 0;
+                    let pointY = 0;
+                    let found = false;
+                    let charId = i === 0 ? wantedCharacterId :  characterIds[Math.floor(Math.random() * characterIds.length)];
+                    for (var i2 = 0; i2 < 5000; i2++) {
+                        // Randomly select points
+                        pointX = Math.floor(bounds.x.min + (Math.random() * (bounds.x.max - bounds.x.min)));
+                        pointY = Math.floor(bounds.y.min + (Math.random() * (bounds.y.max - bounds.y.min)));
+                        if (chosenPoints.length === 0) {
+                            found = true;
+                            break;
+                        }
+                        let tl = {
+                            x: pointX,
+                            y: pointY
+                        };
+                        let tr = {
+                            x: pointX + space.x,
+                            y: pointY
+                        };
+                        let bl = {
+                            x: pointX,
+                            y: pointY + space.y
+                        };
+                        let br = {
+                            x: pointX + space.x,
+                            y: pointY + space.y
+                        };
+                        let conflict = false;
+                        for (var j of chosenPoints) {
+                            let minX = j.x;
+                            let minY = j.y;
+                            let maxX = j.x + space.x;
+                            let maxY = j.y + space.y;
+                            if (
+                                tl.x >= minX && tl.x <= maxX && tl.y >= minY && tl.y <= maxY
+                            ) {
+                                conflict = true;
+                                break;
+                            } else if (
+                                tr.x >= minX && tr.x <= maxX && tr.y >= minY && tr.y <= maxY
+                            ) {
+                                conflict = true;
+                                break;
+                            } else if (
+                                br.x >= minX && br.x <= maxX && br.y >= minY && br.y <= maxY
+                            ) {
+                                conflict = true;
+                                break;
+                            } else if (
+                                bl.x >= minX && bl.x <= maxX && bl.y >= minY && bl.y <= maxY
+                            ) {
+                                conflict = true;
+                                break;
+                            }
+                        }
+                        if (!conflict) {
+                            found = true;
+                            break;
+                        } else {
+                            continue;
+                        }
+                    }
+                    if (!found) {
+                        break;
+                    }
+                    // Subtract from maximum if chosen point conflicts with other spaces
+                    chosenPoints.push({
+                        x: pointX,
+                        y: pointY
+                    });
+                    let character = new Character(charId, i === 0, pointX, pointY, 0, 0, 0, 0, 0, 0);
+                    if (i === 0) {
+                        this.wanted = character;
+                    }
+                    characterArray.push(character);
                 }
             }
             //this.wanted = wantedCharacterId;
             this.characters = characterArray;
             // Organize
-            this.x = (canvas.width / 2 - this.gridDimensions.x + this.offsetX);
-            this.y = (canvas.height / 2 - this.gridDimensions.y + this.offsetY);
-            let col = 0;
-            let row = -1;
-            for (var i of this.characters) {
-                row++;
-                col = 0;
-                for (var j of i) {
-                    j.x = this.x - ((j.image.width / 4 * factors.x) + 40 * factors.x) + (200 * factors.x * col);
-                    j.y = this.y - ((j.image.height / 4 * factors.y) + 40 * factors.y) + (200 * factors.y * row);
-                    j.calculateRespawnPoint();
-                    col++;
+            if (this.style.indexOf('GRID') > -1) {
+                this.x = (canvas.width / 2 - this.gridDimensions.x + this.offsetX);
+                this.y = (canvas.height / 2 - this.gridDimensions.y + this.offsetY);
+                let col = 0;
+                let row = -1;
+                for (var i of this.characters) {
+                    row++;
+                    col = 0;
+                    for (var j of i) {
+                        j.x = this.x - ((j.image.width / 4 * factors.x) + 40 * factors.x) + (200 * factors.x * col);
+                        j.y = this.y - ((j.image.height / 4 * factors.y) + 40 * factors.y) + (200 * factors.y * row);
+                        j.calculateRespawnPoint();
+                        col++;
+                    }
                 }
             }
             this.wantedPoster = new WantedPoster(this.wanted.image, 0, 0, true);
@@ -425,19 +586,25 @@
                 this.wanted.draw();
                 return;
             }
-            this.gridDimensions = {
-                x: this.dimensions[0] * (this.imageArea.width / (2 * 1)) * factors.x,
-                y: this.dimensions[1] * ((this.imageArea.height) / (2 * 1)) * factors.y
-            };
-            this.x = (canvas.width / 2 - this.gridDimensions.x + this.offsetX);
-            this.y = (canvas.height / 2 - this.gridDimensions.y + this.offsetY);
-            let col = 0;
-            let row = -1;
-            for (var i of this.characters) {
-                row++;
-                col = 0;
-                for (var j of i) {
-                    j.draw(deltaTime);
+            if (this.style.indexOf('GRID') > -1) {
+                this.gridDimensions = {
+                    x: this.dimensions[0] * (this.imageArea.width / (2 * 1)) * factors.x,
+                    y: this.dimensions[1] * ((this.imageArea.height) / (2 * 1)) * factors.y
+                };
+                this.x = (canvas.width / 2 - this.gridDimensions.x + this.offsetX);
+                this.y = (canvas.height / 2 - this.gridDimensions.y + this.offsetY);
+                let col = 0;
+                let row = -1;
+                for (var i of this.characters) {
+                    row++;
+                    col = 0;
+                    for (var j of i) {
+                        j.draw(deltaTime);
+                    }
+                }
+            } else {
+                for (var i of this.characters) {
+                    i.draw(deltaTime);
                 }
             }
             // Wanted poster
@@ -662,7 +829,7 @@
         ctx.drawImage(developerImage, 0, 0, developerImage.width, developerImage.height, loadScreenArea.x + (loadScreenArea.width / 2) - 100 * factors.x, loadScreenArea.y + (loadScreenArea.height / 2) - 20 * factors.y, 200 * factors.x, 200 * factors.y);
         ctx.beginPath();
         ctx.fillStyle = `rgba(0, 0, 0, ${(1 - loadScreenImageOpacity) + loadScreenFadeout})`;
-        ctx.fillRect(loadScreenArea.x + (loadScreenArea.width / 2) - 100 * factors.x, loadScreenArea.y + (loadScreenArea.height / 2) - 20 * factors.y, 200 * factors.x, 200 * factors.y);
+        ctx.fillRect(loadScreenArea.x + (loadScreenArea.width / 2) - 102 * factors.x, loadScreenArea.y + (loadScreenArea.height / 2) - 22 * factors.y, 205 * factors.x, 205 * factors.y);
         if (loadScreenTextOpacity <= 1) {
             loadScreenTextOpacity += (deltaTime / .67) / 1;
         } else if (loadScreenPauseDuration <= 1) {
@@ -709,9 +876,137 @@
     let loadScreenImageOpacity = 0;
     let loadScreenStandingDuration = 0;
     let loadScreenFadeout = 0;
-    let solveTimeout = 60;
+    let solveTimeout = 1;
     let awardTimeTimer = 0;
     let awardTimeIndex = 0;
+
+    // Level generator
+
+    function generateLevel(index) {
+        if (index >= 1 && index <= 5) {
+            switch (index) {
+                case 1: return (() => {
+                    return new Level('GRID_2x2', 0, 0, { // 'GRID_2x2'
+                        movePatterns: [
+                            {
+                                run: 0,
+                                rise: 0
+                            },
+                            {
+                                run: 0,
+                                rise: 0
+                            },
+                            {
+                                run: 0,
+                                rise: 0
+                            }
+                        ]
+                    });
+                })();
+                break;
+                case 2: return (() => {
+                    return new Level('GRID_3x2', 0, 0, {
+                        movePatterns: [
+                            {
+                                run: 0,
+                                rise: 0
+                            },
+                            {
+                                run: 0,
+                                rise: 0
+                            },
+                            {
+                                run: 0,
+                                rise: 0
+                            }
+                        ]
+                    });
+                })();
+                break;
+                case 3: return (() => {
+                    return new Level('GRID_3x3', 0, 0, {
+                        movePatterns: [
+                            {
+                                run: 0,
+                                rise: 0
+                            },
+                            {
+                                run: 0,
+                                rise: 0
+                            },
+                            {
+                                run: 0,
+                                rise: 0
+                            }
+                        ]
+                    });
+                })();
+                break;
+                case 4: return (() => {
+                    return new Level('GRID_3x3', 0, 0, {
+                        movePatterns: [
+                            {
+                                run: 2,
+                                rise: 0
+                            },
+                            {
+                                run: -2,
+                                rise: 0
+                            },
+                            {
+                                run: 2,
+                                rise: 0
+                            }
+                        ]
+                    });
+                })();
+                break;
+                case 5: return (() => {
+                    return new Level('GRID_3x3', 0, 0, {
+                        movePatterns: [
+                            {
+                                run: -3,
+                                rise: 0
+                            },
+                            {
+                                run: 3,
+                                rise: -0
+                            },
+                            {
+                                run: -3,
+                                rise: 0
+                            }
+                        ]
+                    });
+                })();
+                break;
+            }
+        } else {
+            return (() => {
+                let lType = ['GRID', 'SCATTERED'][Math.floor(Math.random() * 2)];
+                if (lType === 'GRID') {
+                    let dX = 2 + Math.floor(Math.random() * 5);
+                    let dY = 2 + Math.floor(Math.random() * 5);
+                    let patterns = [];
+                    let move = true // Math.random() > .5;
+                    if (move) {
+                        for (var i = 0; i < dY; i++) {
+                            patterns[i] = {
+                                run: [-3, -2, -1, 1, 2, 3][Math.floor(Math.random() * 6)],
+                                rise: [-3, -2, -1, 1, 2, 3][Math.floor(Math.random() * 6)],
+                            }
+                        }
+                    }
+                    return new Level(`${lType}_${dX}x${dY}`, 0, 0, {
+                        movePatterns: patterns
+                    });
+                }
+                if (lType === 'SCATTERED') {
+                    return new Level(`${lType}_${3 + Math.floor(Math.random() * 38)}`);
+                }
+            })();
+        }
+    }
 
     // Main game loop. Runs on every frame.
     function mainLoop() {
@@ -759,22 +1054,7 @@
         if (game.states.playing) {
             if (!game.states.currentLevel.ready) {
                 // Build the level
-                let level = new Level('GRID_2x2', 0, 0, {
-                    movePatterns: [
-                        {
-                            run: 0,
-                            rise: 0
-                        },
-                        {
-                            run: 0,
-                            rise: 0
-                        },
-                        {
-                            run: 0,
-                            rise: 0
-                        }
-                    ]
-                });
+                let level = generateLevel(game.states.currentLevel.id);
                 level.build().draw(deltaTime);
                 game.states.currentLevel.ready = true;
                 game.states.currentLevel.level = level;
@@ -804,23 +1084,9 @@
                         if (!animateAwardTime(deltaTime)) {
                             game.assets.audio.points.loop = true;
                         } else {
-                            solveTimeout = 60;
-                            let level = new Level("GRID_3x3", 0, 0, {
-                                movePatterns: [
-                                    {
-                                        run: 0,
-                                        rise: 0
-                                    },
-                                    {
-                                        run: 0,
-                                        rise: 0
-                                    },
-                                    {
-                                        run: 0,
-                                        rise: 0
-                                    }
-                                ]
-                            });
+                            solveTimeout = 1;
+                            game.states.currentLevel.id++;
+                            let level = generateLevel(game.states.currentLevel.id);
                             level.build().draw();
                             game.states.currentLevel.solved = false;
                             game.states.currentLevel.level = level;
@@ -828,7 +1094,7 @@
                             return;
                         }
                     } else {
-                        solveTimeout -= 1;
+                        solveTimeout -= deltaTime;
                     }
                 }
             }
