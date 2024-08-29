@@ -4,7 +4,7 @@
     const gameHeight = 1080;
     
     /**
-     * @type {HTMLCanvasElement} canvas Main playable area
+     * @type {HTMLCanvasElement} Main playable area
     **/
     const canvas = document.getElementById('game');
 
@@ -15,7 +15,7 @@
         return {
             x,
             y
-        }
+        };
     }
 
     // Canvas context
@@ -32,10 +32,8 @@
     };
 
     // Load assets
-
     async function loadAssets() {
         let loadSize = assetNames.images.length + assetNames.audio.length;
-
         for (var i of assetNames.images) {
             try {
                 let image = await loadImage(`assets/images/${i}`);
@@ -45,7 +43,6 @@
                 console.error(e);
             }
         }
-
         for (var i of assetNames.audio) {
             try {
                 let audio = await loadAudio(`assets/audio/${i}`);
@@ -56,9 +53,8 @@
             }
         }
     }
+
     // Automatically resize the canvas & maintain aspect ratio
-
-
     function resizeCanvas() {
         const aspectRatio = gameWidth / gameHeight;
         let width = window.innerWidth;
@@ -160,6 +156,7 @@
                     ctx.lineTo(this.x + 125 * factors.x, this.y + 290 * factors.y);
                     ctx.lineTo(this.x + 150 * factors.x, this.y + 310 * factors.y);
                     ctx.stroke();
+
                     // Detect mouse (expanded)
                     if (game.mouse.x >= this.x + 100 * factors.x && game.mouse.x <= this.x + 150 * factors.x && game.mouse.y >= this.y + 290 * factors.x && game.mouse.y <= this.y + 320 * factors.y) {
                         canvas.style.cursor = 'pointer';
@@ -243,6 +240,7 @@
 
     // Characters
     class Character {
+
         /**
          * @param {number} charId The ID for the character
          * @param {boolean} wanted Whether or not the character is wanted
@@ -338,6 +336,7 @@
                     //this.calculateRespawnPoint();
                 }
             }
+
             // Check mouse
             if (game.mouse.x >= this.x && game.mouse.x <= this.x + (this.image.width * factors.x) / 4 && game.mouse.y >= this.y && game.mouse.y <= this.y + (this.image.height * factors.y) / 4) {
                 canvas.style.cursor = 'pointer';
@@ -419,6 +418,7 @@
 
             if (this.style.indexOf('SCATTERED') > -1) {
                 let charCount = Number(this.style.split('_')[1]);
+
                 // Calculate space of character
                 let space = {
                     x: 160 * factors.x,
@@ -428,6 +428,7 @@
                     x: (180) * factors.x,
                     y: (155) * factors.y
                 };
+
                 // Select the boundaries of the play area
                 let bounds = {
                     x: {
@@ -439,52 +440,18 @@
                         max: (canvas.height - playArea.y / 2) - space.y
                     }
                 };
-                let allocatedArea = {
-                    x: Math.floor(bounds.x.max / space.x),
-                    y:  Math.floor(bounds.y.max / space.y)
-                };
-                // Highlight play area for visual reference
-                (() => {
-                    ctx.beginPath();
-                    ctx.moveTo(bounds.x.min, bounds.y.min);
-                    ctx.lineWidth = 2;
-                    ctx.lineTo(bounds.x.min, bounds.y.max + space.y);
-                    ctx.lineTo(bounds.x.max + space.x, bounds.y.max + space.y);
-                    ctx.lineTo(bounds.x.max + space.x, bounds.y.min);
-                    ctx.lineTo(bounds.x.min, bounds.y.min)
-                    ctx.strokeStyle = 'red';
-                    ctx.stroke();
-                })();
+
                 // Random spawn selection
                 let chosenPoints = [];
-                // Visually see spaces
-                for (var jy = bounds.y.min; jy < bounds.y.max; jy += space.y) {
-                    for (var jx = bounds.x.min; jx <= bounds.x.max; jx += space.x) {
-                        ctx.beginPath();
-                        ctx.fillStyle = 'yellow';
-                        ctx.strokeStyle = 'black';
-                        ctx.lineWidth = '1';
-                        ctx.fillRect(jx, jy, space.x, space.y);
-                        ctx.strokeRect(jx, jy, space.x, space.y);
-                        ctx.stroke();
-                        ctx.beginPath();
-                        ctx.fillStyle = 'black';
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'middle'
-                        ctx.font = '30px arial'
-                        ctx.fillText(`${jx}, ${jy}`, jx + (space.x / 2), jy + (space.y / 2), space.x);
-                        // Subtract from maximum if chosen point conflicts with other spaces
-                    }
-                }
-
-
                 for (var i = 0; i < charCount; i++) {
+
                     // Select a random spot within the bounds of the play area
                     let pointX = 0;
                     let pointY = 0;
                     let found = false;
                     let charId = i === 0 ? wantedCharacterId :  characterIds[Math.floor(Math.random() * characterIds.length)];
                     for (var i2 = 0; i2 < 5000; i2++) {
+
                         // Randomly select points
                         pointX = Math.floor(bounds.x.min + (Math.random() * (bounds.x.max - bounds.x.min)));
                         pointY = Math.floor(bounds.y.min + (Math.random() * (bounds.y.max - bounds.y.min)));
@@ -546,6 +513,7 @@
                     if (!found) {
                         break;
                     }
+
                     // Subtract from maximum if chosen point conflicts with other spaces
                     chosenPoints.push({
                         x: pointX,
@@ -558,8 +526,8 @@
                     characterArray.push(character);
                 }
             }
-            //this.wanted = wantedCharacterId;
             this.characters = characterArray;
+
             // Organize
             if (this.style.indexOf('GRID') > -1) {
                 this.x = (canvas.width / 2 - this.gridDimensions.x + this.offsetX);
@@ -607,6 +575,7 @@
                     i.draw(deltaTime);
                 }
             }
+
             // Wanted poster
             this.wantedPoster.draw(game.solveTimer);
         }
@@ -620,6 +589,7 @@
         states: {
             focused: true,
             assetsLoadProgress: 0,
+            loadBarFadeout: .75,
             loadScreenFinished: false,
             loadScreenPlayButtonClicked: false,
             titleScreen: false,
@@ -664,6 +634,7 @@
                     ctx.lineTo(this.x, this.y + 1);
                     ctx.fill();
                     ctx.stroke();
+
                     // Detect mouse
                     if (game.mouse.x >= this.x && game.mouse.x <= this.x + this.width && game.mouse.y >= this.y && game.mouse.y <= this.y + this.height) {
                         canvas.style.cursor = 'pointer';
@@ -673,7 +644,7 @@
                             game.states.loadScreenPlayButtonClicked = true;
                             game.assets.audio.title_screen.loop = true;
                             game.assets.audio.title_screen.play();
-                            game.states.titleScreen = true
+                            game.states.titleScreen = true;
                         };
                     } else {
                         canvas.style.cursor = 'default';
@@ -718,6 +689,7 @@
                     x: Math.floor(canvas.getBoundingClientRect().width / 2 - ((300 / 2) * factors.x)),
                     y: Math.floor(canvas.getBoundingClientRect().height / 2 - (350 * factors.y))
                 };
+
                 // Black screen
                 ctx.beginPath();
                 ctx.fillStyle = 'black';
@@ -727,13 +699,13 @@
                 let loadBarWidth = this.loadScreenArea.width + 340 * factors.x;
                 let progress = (loadBarWidth / 100) * game.states.assetsLoadProgress;
                 ctx.beginPath();
-                ctx.fillStyle = 'green';
+                ctx.fillStyle = `rgba(0,255,0,${(game.states.loadBarFadeout / .75)})`;
                 ctx.fillRect(this.loadScreenArea.x - 170 * factors.x, this.loadScreenArea.y + 350 * factors.y, progress, 50 * factors.y);
 
                 // Load bar background
                 ctx.beginPath();
                 ctx.lineWidth = 2 * factors.x;
-                ctx.strokeStyle = 'white';
+                ctx.strokeStyle = `rgba(255,255,255,${(game.states.loadBarFadeout / .75)})`;
                 ctx.moveTo(this.loadScreenArea.x - 170 * factors.x, this.loadScreenArea.y + 350 * factors.y);
                 ctx.lineTo(this.loadScreenArea.x - 170 * factors.x, this.loadScreenArea.y + 400 * factors.y);
                 ctx.lineTo(this.loadScreenArea.x + this.loadScreenArea.width + 170 * factors.x, this.loadScreenArea.y + 400 * factors.y);
@@ -744,7 +716,7 @@
                 // "Loading..." text
                 ctx.beginPath();
                 ctx.font = `bold ${30 * factors.x}px arcade`;
-                ctx.fillStyle = 'white';
+                ctx.fillStyle = `rgba(255,255,255, ${(game.states.loadBarFadeout / .75) })`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText('Loading...', this.loadScreenArea.x + (this.loadScreenArea.width / 2), this.loadScreenArea.y + 375 * factors.y, 120 * factors.x);
@@ -811,12 +783,15 @@
         };
         const { Tier3Games: developerImage } = game.assets.images;
         game.loadScreen = true;
+
         // Background
         ctx.beginPath();
         ctx.fillStyle = `rgba(0, 0, 0, ${1})`;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+
         // Create area for load screen
         let { loadScreenArea } = game.UI;
+
         // Animate text
         let textTransparency = .1;
         ctx.beginPath();
@@ -881,12 +856,11 @@
     let awardTimeIndex = 0;
 
     // Level generator
-
     function generateLevel(index) {
         if (index >= 1 && index <= 5) {
             switch (index) {
                 case 1: return (() => {
-                    return new Level('GRID_2x2', 0, 0, { // 'GRID_2x2'
+                    return new Level('GRID_2x2', 0, 0, {
                         movePatterns: [
                             {
                                 run: 0,
@@ -988,7 +962,7 @@
                     let dX = 2 + Math.floor(Math.random() * 5);
                     let dY = 2 + Math.floor(Math.random() * 5);
                     let patterns = [];
-                    let move = true // Math.random() > .5;
+                    let move = true; // Math.random() > .5;
                     if (move) {
                         for (var i = 0; i < dY; i++) {
                             patterns[i] = {
@@ -1010,6 +984,8 @@
 
     // Main game loop. Runs on every frame.
     function mainLoop() {
+        let deltaTime = (Date.now() - game.deltaTimeStamp) / 1000;
+        game.deltaTimeStamp = Date.now();
         if (!game.states.focused) {
             requestAnimationFrame(mainLoop);
             return;
@@ -1029,10 +1005,16 @@
             return;
         } else if (!game.assets) {
             game.assets = assets;
+            
+        }
+
+        if (game.states.loadBarFadeout > 0) {
+            game.states.loadBarFadeout -= deltaTime;
+            game.UI.drawLoadBar();
+            requestAnimationFrame(mainLoop);
+            return;
         }
         //context.scale(scaleX, scaleY); 
-        let deltaTime = (Date.now() - game.deltaTimeStamp) / 1000;
-        game.deltaTimeStamp = Date.now();
         if (!game.states.loadScreenFinished) {
             animateLoadScreen(deltaTime);
             requestAnimationFrame(mainLoop);
@@ -1053,6 +1035,7 @@
         }
         if (game.states.playing) {
             if (!game.states.currentLevel.ready) {
+
                 // Build the level
                 let level = generateLevel(game.states.currentLevel.id);
                 level.build().draw(deltaTime);
@@ -1098,7 +1081,6 @@
                     }
                 }
             }
-
         }
         requestAnimationFrame(mainLoop);
     }
