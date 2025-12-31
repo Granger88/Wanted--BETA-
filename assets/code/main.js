@@ -28,7 +28,7 @@
     };
     const assetNames = {
         images: ['Tier3Games.png', 'HEAD_GUMBALL.png', 'HEAD_DARWIN.png', 'HEAD_ANAIS.png', 'HEAD_NICOLE.png', 'HEAD_RICHARD.png'],
-        audio: ['gameplay.mp3', 'points.mp3', 'tick.mp3', 'title_screen.mp3']
+        audio: ['gameplay.mp3', 'points.mp3', 'tick.mp3', 'title_screen.mp3', 'VC_1.mp3', 'VC_2.mp3', 'VC_3.mp3', 'VC_4.mp3', 'VC_5.mp3']
     };
 
     // Load assets
@@ -238,6 +238,36 @@
         }
     }
 
+    // Text labels
+    class TextLabel {
+        constructor(text, font, textColor, backgroundColor, borderSize, borderColor, x, y, width, height, maxWidth) {
+            this.text = text;
+            this.font = font;
+            this.textColor = textColor;
+            this.backgroundColor = backgroundColor;
+            this.borderSize = borderSize;
+            this.borderColor = borderColor;
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+            this.maxWidth = maxWidth;
+        }
+        draw() {
+            ctx.beginPath();
+            ctx.fillStyle = this.backgroundColor;
+            ctx.strokeStyle = this.borderColor;
+            ctx.lineWidth = this.borderSize;
+            ctx.fillRect(this.x, this.y, this.width * factors.x, this.height * factors.y);
+            ctx.strokeRect(this.x, this.y, this.width * factors.x, this.height * factors.y);
+            ctx.beginPath();
+            ctx.fillStyle = this.textColor
+            ctx.font = this.font;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(this.text, this.x + (this.width / 2) * factors.x, this.y + (this.height / 2) * factors.y, this.maxWidth);
+        }
+    }
     // Characters
     class Character {
 
@@ -254,7 +284,9 @@
          * @param {number} oscillateDistanceY The maximum number of pixels the character will oscillate vertically.
          * */
         constructor(charId, wanted, x, y, run, rise, oscillateSpeedX, oscillateDistanceX, oscillateSpeedY, oscillateDistanceY) {
+            
             this.image = game.assets.images[['HEAD_GUMBALL', 'HEAD_DARWIN', 'HEAD_ANAIS', 'HEAD_NICOLE', 'HEAD_RICHARD'][charId - 1]];
+            this.image.height = 450;
             this.wanted = wanted;
             this.x = x;
             this.y = y;
@@ -263,7 +295,12 @@
             this.oscillateSpeedX = oscillateSpeedX;
             this.oscillateDistanceX = oscillateDistanceX;
             this.oscillateSpeedY = oscillateSpeedY;
-            this.oscillateDistanceY = oscillateDistanceY
+            this.oscillateDistanceY = oscillateDistanceY;
+            this.respawned = false;
+            this.origin = {
+                x: canvas.width,
+                y: canvas.height
+            };
             this.oscillationState = {
                 x: {
                     current: 0,
@@ -279,66 +316,65 @@
                 y: 0
             };
             this.respawnTimeout = 0;
-        }
-        calculateRespawnPoint() {
-            if (this.rise === 0 || this.run === 0) {
-                if (Math.abs(this.run) > 0) {
-                    while (this.respawnPoint.x <= canvas.width && this.respawnPoint.x >= -this.image.width / 4) {
-                        this.respawnPoint.x = this.respawnPoint.x - this.run;
-                    }
-                } else {
-                    this.respawnPoint.x = this.x;
-                }
-                if (Math.abs(this.rise) > 0) {
-                    while (this.respawnPoint.y <= canvas.height && this.respawnPoint.y >= -this.image.height / 4) {
-                        this.respawnPoint.y = this.respawnPoint.y - this.rise;
-                    }
-                } else {
-                    this.respawnPoint.y = this.y;
-                }
-            } else {
-                this.respawnPoint.x = this.x;
-                this.respawnPoint.y = this.y;
-                while (this.respawnPoint.x > -this.image.width / 4 && this.respawnPoint.x < canvas.width + this.image.width / 4 && this.respawnPoint.y > -this.image.height / 4 && this.respawnPoint.y < canvas.height + this.image.height / 4) {
-                    this.respawnPoint.x -= this.run;
-                    this.respawnPoint.y -= this.rise;
-                }
+            /**
+             * @type {HTMLAudioElement}
+             */
+            this.voiceClip = game.assets.audio[`VC_${charId}`] || null;
+            game.states.vcFinished = false;
+            if (this.voiceClip) {
+                this.voiceClip.onended = () => {
+                    game.states.vcFinished = true;
+                };
             }
         }
-        draw(deltaTime) {
+        async calculateRespawnPoint() {
+            if (this.run !== 0 || this.rise !== 0) {
+                let respawnPoints = {x: this.x, y: this.y};
+                while (respawnPoints.x < canvas.width && respawnPoints.x + (this.image.width * factors.x / 4) > 0 && respawnPoints.y < canvas.height && respawnPoints.y + (this.image.height * factors.y / 4) > 0) {
+                    respawnPoints.x -= this.run;
+                    respawnPoints.y -= this.rise;
+                }
+                this.respawnPoint = respawnPoints;
+            }
+        }
+        async voiceClipFinished () {
+
+        }
+        async draw(deltaTime) {
+            // Initially set it according to the origin factors
+            let originFactors = {
+                width: canvas.width / this.origin.x,
+                height: canvas.height / this.origin.y
+            };
+            this.x = (this.x * originFactors.width);
+            this.y = (this.y * originFactors.height);
+            this.respawnPoint.x = this.respawnPoint.x * originFactors.width;
+            this.respawnPoint.y = this.respawnPoint.y * originFactors.height;
             let speedMultiplier = 60 / Math.floor(1 / deltaTime);
-            ctx.beginPath();
-            ctx.drawImage(this.image, 0, 0, this.image.width, this.image.height, this.x, this.y, (this.image.width * factors.x) / 4, (this.image.height * factors.y) / 4);
-            if (!game.states.currentLevel.solved) {
+            if (!game.states.currentLevel.solved && !game.states.currentLevel.over) {
                 this.x += (this.run * factors.x) * speedMultiplier;
                 this.y += (this.rise * factors.y) * speedMultiplier;
-                if (Math.abs(this.oscillationState.x.current) >= this.oscillateDistanceX) {
-                    this.oscillationState.x.multiplier = -this.oscillationState.x.multiplier
-                }
-                this.oscillationState.x.current += this.oscillateSpeedX * this.oscillationState.x.multiplier;
-                if (Math.abs(this.oscillationState.y.current) >= this.oscillateDistanceY) {
-                    this.oscillationState.y.multiplier = -this.oscillationState.y.multiplier
-                }
-                this.oscillationState.y.current += this.oscillateSpeedY * this.oscillationState.y.multiplier;
-                this.x += this.run + this.oscillationState.x.current * speedMultiplier;
-                this.y += this.rise + this.oscillationState.y.current * speedMultiplier;
-                if ((this.x >= canvas.width || this.x <= -this.image.width / 4) || (this.y >= canvas.height || this.y <= -this.image.height / 4)) {
-                    if (this.run < 0 && this.x > 0) {
+                if ((!this.respawned) && (this.x - (this.image.width * factors.x / 4) > canvas.width || this.x + (this.image.width * factors.x / 4) < 0 || this.y - (this.image.height * factors.y / 4) > canvas.height || this.y + (this.image.height * factors.y / 4) < 0)) {
+                    if (isNaN(this.x) || isNaN(this.y)) {
+                        console.log("NaN coordinates detected:", this);
                         return;
                     }
-                    if (this.rise < 0 && this.y > 0) {
-                        return;
-                    }
-                    console.log('Out of bounds!');
                     this.x = this.respawnPoint.x;
                     this.y = this.respawnPoint.y;
-                    this.respawnTimeout = 10;
-                    //this.calculateRespawnPoint();
-                }
+                    this.respawned = true;
+                } else {
+                    this.respawned = false;
+                }   
             }
-
+            ctx.beginPath();
+            ctx.drawImage(this.image, 0, 0, this.image.width, this.image.height, this.x * (canvas.width / this.origin.x), this.y * (canvas.height / this.origin.y), (this.image.width * factors.x) / 4, (this.image.height * factors.y) / 4);
+            
             // Check mouse
-            if (game.mouse.x >= this.x && game.mouse.x <= this.x + (this.image.width * factors.x) / 4 && game.mouse.y >= this.y && game.mouse.y <= this.y + (this.image.height * factors.y) / 4) {
+            /* Draw visible mouse hitbox
+            ctx.beginPath();
+            ctx.fillStyle = "rgba(255, 0, 0, .5)";
+            ctx.fillRect(this.x * (canvas.width / this.origin.x), this.y * (canvas.height / this.origin.y), this.image.width * factors.x / 4, this.image.height * factors.y / 4);*/
+            if (game.mouse.x >= this.x * (canvas.width / this.origin.x) && game.mouse.x <= (this.x * (canvas.width / this.origin.x)) + (this.image.width * factors.x) / 4 && game.mouse.y >= this.y * (canvas.height / this.origin.y) && game.mouse.y <= (this.y * (canvas.height / this.origin.y)) + (this.image.height * factors.y) / 4) {
                 canvas.style.cursor = 'pointer';
                 game.mouseHit = this;
                 game.handlers.mouseAction = () => {
@@ -347,6 +383,9 @@
                         game.solveTimer -= game.solveTimer >= 10 ? 10 : game.solveTimer;
                     } else {
                         game.states.currentLevel.solved = true;
+                        if (this.voiceClip) {
+                            this.voiceClip.play();
+                        }
                     }
                 }
             } else {
@@ -354,6 +393,13 @@
                     canvas.style.cursor = 'default';
                     game.handlers.mouseAction = () => { };
                 }
+            }
+
+            if (canvas.width !== this.origin.x && canvas.height !== this.origin.y) {
+                this.origin = {
+                    x: canvas.width,
+                    y: canvas.height
+                };
             }
         }
     }
@@ -363,9 +409,10 @@
         /** 
          * @param {"GRID_*" | "SCATTERED" | "SCATTERED_MOVING"} style
         */
-        constructor(style, offsetX, offsetY, moveData) {
+        constructor(style, offsetX, offsetY, moveData, gridMoveY) {
             this.style = style;
             this.wanted = null;
+            this.gridMoveY = gridMoveY || false;
             this.characters = [];
             this.x = 0;
             this.y = 0;
@@ -379,7 +426,7 @@
                 height: 100
             };
         }
-        build() {
+        async build() {
             let wantedCharacterId = Math.floor(Math.random() * 5) + 1;
             let characterIds = [1, 2, 3, 4, 5];
             characterIds = characterIds.filter((i) => i !== wantedCharacterId);
@@ -388,8 +435,8 @@
                 // Calculate space needed
                 this.dimensions = this.style.split('_')[1].split('x');
                 this.gridDimensions = {
-                    x: this.dimensions[0] * (this.imageArea.width / (2 * 1)) * factors.x,
-                    y: this.dimensions[1] * ((this.imageArea.height) / (2 * 1)) * factors.y
+                    x: this.dimensions[0] * (this.imageArea.width / (2)) * factors.x,
+                    y: this.dimensions[1] * ((this.imageArea.height) / (2)) * factors.y
                 };
                 this.x = (canvas.width / 2 - this.gridDimensions.x + this.offsetX);
                 this.y = (canvas.height / 2 - this.gridDimensions.y + this.offsetY);
@@ -519,7 +566,20 @@
                         x: pointX,
                         y: pointY
                     });
-                    let character = new Character(charId, i === 0, pointX, pointY, 0, 0, 0, 0, 0, 0);
+                    let character = new Character(charId, i === 0, pointX, pointY, (() => {
+                                    let n = 0;
+                                    do {
+                                        n = 12 - Math.floor(Math.random() * 24);
+                                    } while (n === 0);
+                                    return n;
+                                })(), (() => {
+                                    let n = 0;
+                                    do {
+                                        n = 12 - Math.floor(Math.random() * 24);
+                                    } while (n === 0);
+                                    return n;
+                                })(), 0, 0, 0, 0);
+                    character.calculateRespawnPoint();
                     if (i === 0) {
                         this.wanted = character;
                     }
@@ -538,8 +598,8 @@
                     row++;
                     col = 0;
                     for (var j of i) {
-                        j.x = this.x - ((j.image.width / 4 * factors.x) + 40 * factors.x) + (200 * factors.x * col);
-                        j.y = this.y - ((j.image.height / 4 * factors.y) + 40 * factors.y) + (200 * factors.y * row);
+                        j.x = this.x - ((j.image.width / 4 * factors.x) + 40 * factors.x) + (200 * factors.x * (!this.gridMoveY ? col : row));
+                        j.y = this.y - ((j.image.height / 4 * factors.y) + 40 * factors.y) + (200 * factors.y * (!this.gridMoveY ? row : col));
                         j.calculateRespawnPoint();
                         col++;
                     }
@@ -548,8 +608,9 @@
             this.wantedPoster = new WantedPoster(this.wanted.image, 0, 0, true);
             return this;
         }
-        draw(deltaTime) {
-            if (game.states.currentLevel.solved) {
+        async draw(deltaTime) {
+            // Draw wanted character if game is solved or over
+            if (game.states.currentLevel.solved || game.states.currentLevel.over) {
                 this.wantedPoster.draw(game.solveTimer);
                 this.wanted.draw();
                 return;
@@ -567,12 +628,12 @@
                     row++;
                     col = 0;
                     for (var j of i) {
-                        j.draw(deltaTime);
+                        await j.draw(deltaTime);
                     }
                 }
             } else {
                 for (var i of this.characters) {
-                    i.draw(deltaTime);
+                    await i.draw(deltaTime);
                 }
             }
 
@@ -586,7 +647,12 @@
 
     // Main game object
     const game = {
+        deltaTimeStamp: Date.now(),
+        solveTimer: 15,
+        penalty: 0,
+        gameOverTimeout: 0,
         states: {
+            assetsReady: false,
             focused: true,
             assetsLoadProgress: 0,
             loadBarFadeout: .75,
@@ -595,10 +661,12 @@
             titleScreen: false,
             tutorial: false,
             playing: false,
+            vcFinished: false,
             currentLevel: {
                 id: 1,
                 characters: [],
                 solved: false,
+                over: false,
                 ready: false,
                 level: null
             }
@@ -679,8 +747,33 @@
                     ctx.drawImage(game.assets.images.Tier3Games, 0, 0, game.assets.images.Tier3Games.width, game.assets.images.Tier3Games.height, canvas.width - (150 * factors.x), canvas.height - (150 * factors.y), 100 * factors.x, 100 * factors.y);
                 }
             },
-            playingScreen: {
-
+            gameOverScreen: {
+                x: 0,
+                y: 0,
+                width: 640,
+                height: 360,
+                draw() {
+                    ctx.beginPath();
+                    ctx.fillStyle = 'crimson';
+                    
+                    ctx.fillRect(canvas.width / 2 - this.width / 2 * factors.x, canvas.height / 2 - this.height / 2 * factors.y, this.width * factors.x, this.height * factors.y);
+                    ctx.beginPath();
+                    ctx.strokeStyle = 'black';
+                    ctx.lineWidth = 6 * factors.x;
+                    ctx.strokeRect(canvas.width / 2 - this.width / 2 * factors.x, canvas.height / 2 - this.height / 2 * factors.y, this.width * factors.x, this.height * factors.y);
+                    let label = new TextLabel('GAME OVER', `bold ${40 * factors.x}px arial`, 'white', 'transparent', 0, 'transparent', (canvas.width / 2) - 125 * factors.x, 360 * factors.y, 250, 70, 250 * factors.x);
+                    let playButton = new TextButton('RESTART', `bold ${40 * factors.x}px ariel`, 'white', 'green', 2, 'white', (canvas.width / 2) - 125 * factors.x, 600 * factors.y, 250, 70, 250 * factors.x, () => {
+                        game.solveTimer = 15;
+                        game.states.currentLevel.over = false;
+                        game.states.currentLevel.id = 1;
+                        game.states.currentLevel.level = null;
+                        game.states.currentLevel.ready = false;
+                        game.gameOverTimeout = 0;
+                    });
+                    label.draw();
+                    playButton.draw();
+                    ctx.beginPath();
+                }
             },
             drawLoadBar() {
                 game.UI.loadScreenArea = {
@@ -731,10 +824,7 @@
             mouseAction() {
 
             }
-        },
-        deltaTimeStamp: Date.now(),
-        solveTimer: 30,
-        penalty: 0
+        }
     };
 
     // Canvas events
@@ -742,7 +832,7 @@
         game.mouse.x = event.x - canvas.getBoundingClientRect().x;
         game.mouse.y = event.y - canvas.getBoundingClientRect().y;
     });
-    canvas.addEventListener('click', (event) => {
+    canvas.addEventListener('click', async (event) => {
         game.mouse.x = event.x - canvas.getBoundingClientRect().x;
         game.mouse.y = event.y - canvas.getBoundingClientRect().y;
         game.handlers.mouseAction();
@@ -860,41 +950,11 @@
         if (index >= 1 && index <= 5) {
             switch (index) {
                 case 1: return (() => {
-                    return new Level('GRID_2x2', 0, 0, {
-                        movePatterns: [
-                            {
-                                run: 0,
-                                rise: 0
-                            },
-                            {
-                                run: 0,
-                                rise: 0
-                            },
-                            {
-                                run: 0,
-                                rise: 0
-                            }
-                        ]
-                    });
+                    return new Level('GRID_2x2', 0, 0);
                 })();
                 break;
                 case 2: return (() => {
-                    return new Level('GRID_3x2', 0, 0, {
-                        movePatterns: [
-                            {
-                                run: 0,
-                                rise: 0
-                            },
-                            {
-                                run: 0,
-                                rise: 0
-                            },
-                            {
-                                run: 0,
-                                rise: 0
-                            }
-                        ]
-                    });
+                    return new Level('GRID_3x2', 0, 0);
                 })();
                 break;
                 case 3: return (() => {
@@ -920,15 +980,15 @@
                     return new Level('GRID_3x3', 0, 0, {
                         movePatterns: [
                             {
-                                run: 2,
+                                run: 4,
                                 rise: 0
                             },
                             {
-                                run: -2,
+                                run: -4,
                                 rise: 0
                             },
                             {
-                                run: 2,
+                                run: 4,
                                 rise: 0
                             }
                         ]
@@ -939,15 +999,15 @@
                     return new Level('GRID_3x3', 0, 0, {
                         movePatterns: [
                             {
-                                run: -3,
+                                run: -8,
                                 rise: 0
                             },
                             {
-                                run: 3,
+                                run: 8,
                                 rise: -0
                             },
                             {
-                                run: -3,
+                                run: -8,
                                 rise: 0
                             }
                         ]
@@ -958,22 +1018,30 @@
         } else {
             return (() => {
                 let lType = ['GRID', 'SCATTERED'][Math.floor(Math.random() * 2)];
+                let move = Math.random() > .5;
+                let gridMoveY =  Math.random() > .5;
                 if (lType === 'GRID') {
                     let dX = 2 + Math.floor(Math.random() * 5);
                     let dY = 2 + Math.floor(Math.random() * 5);
                     let patterns = [];
-                    let move = true; // Math.random() > .5;
                     if (move) {
                         for (var i = 0; i < dY; i++) {
-                            patterns[i] = {
-                                run: [-3, -2, -1, 1, 2, 3][Math.floor(Math.random() * 6)],
-                                rise: [-3, -2, -1, 1, 2, 3][Math.floor(Math.random() * 6)],
-                            }
+                            patterns[i] = patterns[i] || {
+                                run: 0,
+                                rise: 0
+                            };
+                            patterns[i][gridMoveY ? 'rise' : 'run'] = (() => {
+                                let n = 0;
+                                do {
+                                    n = 12 - Math.floor(Math.random() * 24);
+                                } while (n === 0);
+                                return n;
+                            })() * (true ? 1 : -1);
                         }
                     }
                     return new Level(`${lType}_${dX}x${dY}`, 0, 0, {
                         movePatterns: patterns
-                    });
+                    }, gridMoveY);
                 }
                 if (lType === 'SCATTERED') {
                     return new Level(`${lType}_${3 + Math.floor(Math.random() * 38)}`);
@@ -983,7 +1051,7 @@
     }
 
     // Main game loop. Runs on every frame.
-    function mainLoop() {
+    async function mainLoop() {
         let deltaTime = (Date.now() - game.deltaTimeStamp) / 1000;
         game.deltaTimeStamp = Date.now();
         if (!game.states.focused) {
@@ -999,7 +1067,7 @@
         resizeCanvas();
 
         // ---- [ALL DRAWN ELEMENTS MUST GO BELOW THIS LINE AS THE CANVAS HAS NOW BEEN CLEARED, SCALED, AND THE SCALE FACTORS ARE DEFINED] ----
-        if (game.states.assetsLoadProgress < 100) {
+        if (!game.states.assetsReady) {
             game.UI.drawLoadBar();
             requestAnimationFrame(mainLoop);
             return;
@@ -1038,7 +1106,7 @@
 
                 // Build the level
                 let level = generateLevel(game.states.currentLevel.id);
-                level.build().draw(deltaTime);
+                (await level.build()).draw(deltaTime);
                 game.states.currentLevel.ready = true;
                 game.states.currentLevel.level = level;
             } else {
@@ -1053,8 +1121,25 @@
                         if (oldTime > Math.ceil(game.solveTimer)) {
                             game.assets.audio.tick.play();
                         }
-                    } else {
-                        console.log('Time\'s up.');
+                    } else { // Time's up. Begin end game sequence
+                        game.states.currentLevel.over = true;
+                        game.gameOverTimeout = game.gameOverTimeout === null ? null : game.gameOverTimeout > 0 ? game.gameOverTimeout : 1.5;
+                        ctx.fillStyle = 'yellow';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        game.penalty = false;
+                        game.states.currentLevel.level.draw(deltaTime);
+                        game.states.currentLevel.level.wantedPoster.collapsible = false;
+                        game.states.currentLevel.level.wantedPoster.collapsed = false
+                        if (game.gameOverTimeout >= 0 && game.gameOverTimeout !== null) {
+                            game.gameOverTimeout -= deltaTime;
+                            if (game.gameOverTimeout < 0) {
+                                game.gameOverTimeout = null;
+                            }
+                        } else {
+                            game.UI.gameOverScreen.draw();
+                        }
+                        requestAnimationFrame(mainLoop);
+                        return;
                     }
                 } else {
                     ctx.fillStyle = 'yellow';
@@ -1063,14 +1148,31 @@
                     game.states.currentLevel.level.draw(deltaTime);
                     game.states.currentLevel.level.wantedPoster.collapsible = false;
                     game.states.currentLevel.level.wantedPoster.collapsed = false;
-                    if (solveTimeout <= 0) {
+                    if (game.states.currentLevel.level.wanted.voiceClip) {
+                        if (game.states.vcFinished) {
+                            if (!animateAwardTime(deltaTime)) {
+                                game.assets.audio.points.loop = true;
+                            } else {
+                                solveTimeout = 1;
+                                game.states.currentLevel.id++;
+                                let level = generateLevel(game.states.currentLevel.id);
+                                (await level.build()).draw();
+                                game.states.currentLevel.solved = false;
+                                game.states.currentLevel.level = level;
+                                requestAnimationFrame(mainLoop);
+                                return;
+                            }
+                        }
+
+
+                    } else if (solveTimeout <= 0) {
                         if (!animateAwardTime(deltaTime)) {
                             game.assets.audio.points.loop = true;
                         } else {
                             solveTimeout = 1;
                             game.states.currentLevel.id++;
                             let level = generateLevel(game.states.currentLevel.id);
-                            level.build().draw();
+                            (await level.build()).draw();
                             game.states.currentLevel.solved = false;
                             game.states.currentLevel.level = level;
                             requestAnimationFrame(mainLoop);
@@ -1083,9 +1185,11 @@
             }
         }
         requestAnimationFrame(mainLoop);
+        // ---- [END OF DRAWN ELEMENTS - DO NOT WRITE GAME LOGIC BELOW THIS LINE] ----
     }
     requestAnimationFrame(mainLoop);
 
     // Load assets
     await loadAssets();
+    game.states.assetsReady = true;
 })();
